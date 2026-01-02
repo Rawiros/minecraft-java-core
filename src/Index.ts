@@ -4,7 +4,7 @@
  */
 
 import AZauth from './Authenticator/AZauth.js';
-import Launch from './Launch.js';
+import Launcher from './Launcher.js';
 import Microsoft from './Authenticator/Microsoft.js';
 import * as Mojang from './Authenticator/Mojang.js';
 import Status from './StatusServer/status.js';
@@ -12,7 +12,7 @@ import Downloader from './utils/Downloader.js';
 
 export {
     AZauth as AZauth,
-    Launch as Launch,
+    Launcher as Launcher,
     Microsoft as Microsoft,
     Mojang as Mojang,
     Status as Status,

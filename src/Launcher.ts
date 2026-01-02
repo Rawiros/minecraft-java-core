@@ -20,7 +20,10 @@ import argumentsMinecraft from './Minecraft/Minecraft-Arguments.js';
 import { isold } from './utils/Index.js';
 import Downloader from './utils/Downloader.js';
 
-type loader = {
+export type LoaderType = 'forge' | 'neoforge' | 'fabric' | 'legacyfabric' | 'quilt';
+export type JavaType = 'jre' | 'jdk' | 'testimage' | 'debugimage' | 'staticlibs' | 'sources' | 'sbom';
+
+export type loader = {
 	/**
 	 * Path to loader directory. Relative to absolute path to Minecraft's root directory (config option `path`).
 	 * 
@@ -30,11 +33,9 @@ type loader = {
 	 */
 	path?: string,
 	/**
-	 * Loader type. 
-	 * 
-	 * Acceptable values: `'forge'`, `'neoforge'`, `'fabric'`, `'legacyfabric'`, `'quilt'`.
+	 * Loader type.
 	 */
-	type?: string,
+	type?: LoaderType,
 	/**
 	 * Loader build (version).
 	 * 
@@ -52,7 +53,7 @@ type loader = {
 /**
  * Screen options.
  */
-type screen = {
+export type screenOptions = {
 	width?: number,
 	height?: number,
 	/**
@@ -64,7 +65,7 @@ type screen = {
 /**
  * Memory limits
  */
-type memory = {
+export type memoryLimits = {
 	/**
 	 * Sets the `-Xms` JVM argument. This is the initial memory usage.
 	 */
@@ -78,7 +79,7 @@ type memory = {
 /** 
  * Java download options
  */
-type javaOPTS = {
+export type javaOptions = {
 	/**
 	 * Absolute path to Java binaries directory. 
 	 * 
@@ -101,13 +102,13 @@ type javaOPTS = {
 	 * 
 	 * Using `jre` is recommended since it only has what's needed.
 	 */
-	type: string
+	type: JavaType
 }
 
 /** 
  * Launch options.
  */
-export type LaunchOPTS = {
+export type LaunchOptions = {
 	/**
 	 * URL to the launcher backend. Refer to [Selvania Launcher Wiki](https://github.com/luuxis/Selvania-Launcher/blob/master/docs/wiki_EN-US.md) for setup instructions.
 	 */
@@ -188,22 +189,22 @@ export type LaunchOPTS = {
 	/**
 	 * Java options.
 	 */
-	java: javaOPTS,
+	java: javaOptions,
 	/**
 	 * Screen options.
 	 */
-	screen: screen,
+	screen: screenOptions,
 	/**
 	 * Memory limit options.
 	 */
-	memory: memory
+	memory: memoryLimits
 };
 
-export default class Launch extends EventEmitter {
-	options: LaunchOPTS;
+export default class Launcher extends EventEmitter {
+	options: LaunchOptions;
 
-	async Launch(opt: LaunchOPTS) {
-		const defaultOptions: LaunchOPTS = {
+	async launch(options: Partial<LaunchOptions>) {
+		const defaultOptions: LaunchOptions = {
 			url: null,
 			authenticator: null,
 			timeout: 10000,
@@ -245,7 +246,7 @@ export default class Launch extends EventEmitter {
 				min: '1G',
 				max: '2G'
 			},
-			...opt,
+			...options,
 		};
 
 		this.options = defaultOptions;
@@ -257,6 +258,7 @@ export default class Launch extends EventEmitter {
 		}
 
 		if (this.options.loader.type) {
+			//@ts-ignore
 			this.options.loader.type = this.options.loader.type.toLowerCase()
 			this.options.loader.build = this.options.loader.build.toLowerCase()
 		}
