@@ -1,5 +1,5 @@
-const { Launch, Microsoft } = require('minecraft-java-core');
-const launcher = new Launch();
+const { Launcher, Microsoft } = require('minecraft-java-core');
+const launcher = new Launcher();
 
 const fs = require('fs');
 let mc
@@ -27,6 +27,7 @@ let mc
         version: '1.8.9',
         intelEnabledMac: true,
         instance: "Hypixel",
+        
 
         ignored: [
             "config",
@@ -47,7 +48,7 @@ let mc
         },
     };
 
-    launcher.Launch(opt);
+    launcher.launch(opt);
     launcher.on('progress', (progress, size) => console.log(`[DL] ${((progress / size) * 100).toFixed(2)}%`));
     launcher.on('patch', pacth => process.stdout.write(pacth));
     launcher.on('data', line => process.stdout.write(line));

@@ -1,6 +1,6 @@
 const prompt = require('prompt')
-const { AZauth, Launch } = require('../build/Index');
-const launch = new Launch();
+const { AZauth, Launcher } = require('../build/Index');
+const launcher = new Launcher();
 const auth = new AZauth('https://nincraft.fr');
 const fs = require('fs');
 
@@ -78,44 +78,44 @@ async function main() {
         }
     }
 
-    await launch.Launch(opt);
+    await launcher.launch(opt);
 
-    launch.on('extract', extract => {
+    launcher.on('extract', extract => {
         console.log(extract);
     });
 
-    launch.on('progress', (progress, size, element) => {
+    launcher.on('progress', (progress, size, element) => {
         console.log(`Downloading ${element} ${Math.round((progress / size) * 100)}%`);
     });
 
-    launch.on('check', (progress, size, element) => {
+    launcher.on('check', (progress, size, element) => {
         console.log(`Checking ${element} ${Math.round((progress / size) * 100)}%`);
     });
 
-    launch.on('estimated', (time) => {
+    launcher.on('estimated', (time) => {
         let hours = Math.floor(time / 3600);
         let minutes = Math.floor((time - hours * 3600) / 60);
         let seconds = Math.floor(time - hours * 3600 - minutes * 60);
         console.log(`${hours}h ${minutes}m ${seconds}s`);
     })
 
-    launch.on('speed', (speed) => {
+    launcher.on('speed', (speed) => {
         console.log(`${(speed / 1067008).toFixed(2)} Mb/s`)
     })
 
-    launch.on('patch', patch => {
+    launcher.on('patch', patch => {
         console.log(patch);
     });
 
-    launch.on('data', (e) => {
+    launcher.on('data', (e) => {
         console.log(e);
     })
 
-    launch.on('close', code => {
+    launcher.on('close', code => {
         console.log(code);
     });
 
-    launch.on('error', err => {
+    launcher.on('error', err => {
         console.log(err);
     });
 }
