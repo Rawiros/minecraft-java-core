@@ -6,7 +6,7 @@
 import { EventEmitter } from 'events';
 import path from 'path';
 import fs from 'fs';
-import { spawn } from 'child_process';
+import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 
 import jsonMinecraft from './Minecraft/Minecraft-Json.js';
 import librariesMinecraft from './Minecraft/Minecraft-Libraries.js';
@@ -197,11 +197,54 @@ export type LaunchOptions = {
 	/**
 	 * Memory limit options.
 	 */
-	memory?: memoryLimits
+	memory?: memoryLimits,
+	/**
+	 * Optional async hook executed before the game is spawned.
+	 * Throwing or rejecting aborts the launch. Receives an AbortSignal to support cancellation.
+	 */
+	preLaunch?: (signal: AbortSignal) => Promise<void> | void
 };
+
+type DownloadElement = any;
+
+export interface LauncherEvents {
+	// lifecycle
+	starting: [resolvedOptions: LaunchOptions];
+	spawn: [process: ChildProcessWithoutNullStreams, javaPath: string, args: string[], cwd: string];
+	close: [message: string | number | undefined];
+
+	// io and logging
+	data: [message: string];
+
+	// errors
+	error: [error: any];
+
+	// downloads and install progress
+	progress: [downloaded: number, total: number, element: DownloadElement];
+	speed: [bytesPerSecond: number];
+	estimated: [seconds: number];
+	extract: [progress: any];
+	check: [progress: any, size: any, element: any];
+	patch: [patchInfo: any];
+}
 
 export default class Launcher extends EventEmitter {
 	options: LaunchOptions;
+	private _abortController?: AbortController;
+
+	// Typed EventEmitter helpers
+	on<E extends keyof LauncherEvents>(event: E, listener: (...args: LauncherEvents[E]) => void): this { return super.on(event as string, listener); }
+	once<E extends keyof LauncherEvents>(event: E, listener: (...args: LauncherEvents[E]) => void): this { return super.once(event as string, listener); }
+	off<E extends keyof LauncherEvents>(event: E, listener: (...args: LauncherEvents[E]) => void): this { return super.off(event as string, listener); }
+	emit<E extends keyof LauncherEvents>(event: E, ...args: LauncherEvents[E]): boolean { return super.emit(event as string, ...args); }
+
+	/**
+	 * Allows canceling a launch in progress before the game is spawned.
+	 */
+	cancelLaunch(): void {
+		if (!this._abortController) return;
+		this._abortController.abort();
+	}
 
 	async launch(options: Partial<LaunchOptions>) {
 		this.options = this.getLaunchOptions(options);
@@ -227,7 +270,7 @@ export default class Launcher extends EventEmitter {
 	}
 
 	getLaunchOptions(optionsOverride: Partial<LaunchOptions> = {}): LaunchOptions {
-		return {
+		const baseOptions: LaunchOptions = {
 			url: null,
 			authenticator: null,
 			timeout: 10000,
@@ -269,46 +312,77 @@ export default class Launcher extends EventEmitter {
 				min: '1G',
 				max: '2G'
 			},
-			...optionsOverride,
+			preLaunch: undefined,
+		};
+
+		if (!optionsOverride?.authenticator?.meta?.online) {
+			optionsOverride.bypassOffline = true;
 		}
+
+		return {
+			...baseOptions,
+			...optionsOverride
+		};
 	}
 
 	async start() {
-		let data: any = await this.downloadGame();
-		if (data.error) return this.emit('error', data);
-		let { minecraftJson, minecraftLoader, minecraftVersion, minecraftJava } = data;
+		this._abortController = new AbortController();
 
-		let minecraftArguments: any = await new argumentsMinecraft(this.options).GetArguments(minecraftJson, minecraftLoader);
-		if (minecraftArguments.error) return this.emit('error', minecraftArguments);
+		this.emit('starting', this.options);
 
-		let loaderArguments: any = await new loaderMinecraft(this.options).GetArguments(minecraftLoader, minecraftVersion);
-		if (loaderArguments.error) return this.emit('error', loaderArguments);
+		try {
+			if (typeof this.options.preLaunch === 'function') {
+				await this.options.preLaunch(this._abortController.signal);
+				if (this._abortController.signal.aborted) {
+					return; // silently stop if aborted
+				}
+			}
 
-		let Arguments: any = [
-			...minecraftArguments.jvm,
-			...minecraftArguments.classpath,
-			...loaderArguments.jvm,
-			minecraftArguments.mainClass,
-			...minecraftArguments.game,
-			...loaderArguments.game
-		]
+			let data: any = await this.downloadGame();
+			if (data.error) return this.emit('error', data);
+			let { minecraftJson, minecraftLoader, minecraftVersion, minecraftJava } = data;
 
-		let java: any = this.options.java.path ? this.options.java.path : minecraftJava.path;
-		let logs = this.options.instance ? `${this.options.path}/instances/${this.options.instance}` : this.options.path;
-		if (!fs.existsSync(logs)) fs.mkdirSync(logs, { recursive: true });
+			let minecraftArguments: any = await new argumentsMinecraft(this.options).GetArguments(minecraftJson, minecraftLoader);
+			if (minecraftArguments.error) return this.emit('error', minecraftArguments);
 
-		let argumentsLogs: string = Arguments.join(' ')
-		argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.access_token, '????????')
-		argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.client_token, '????????')
-		argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.uuid, '????????')
-		argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.xboxAccount?.xuid, '????????')
-		argumentsLogs = argumentsLogs.replaceAll(`${this.options.path}/`, '')
-		this.emit('data', `Launching with arguments ${argumentsLogs}`);
+			let loaderArguments: any = await new loaderMinecraft(this.options).GetArguments(minecraftLoader, minecraftVersion);
+			if (loaderArguments.error) return this.emit('error', loaderArguments);
 
-		let minecraftDebug = spawn(java, Arguments, { cwd: logs, detached: this.options.detached })
-		minecraftDebug.stdout.on('data', (data) => this.emit('data', data.toString('utf-8')))
-		minecraftDebug.stderr.on('data', (data) => this.emit('data', data.toString('utf-8')))
-		minecraftDebug.on('close', (code) => this.emit('close', 'Minecraft closed'))
+			let gameArguments: string[] = [
+				...minecraftArguments.jvm,
+				...minecraftArguments.classpath,
+				...loaderArguments.jvm,
+				minecraftArguments.mainClass,
+				...minecraftArguments.game,
+				...loaderArguments.game
+			]
+
+			let java: string = this.options.java.path ? this.options.java.path : minecraftJava.path;
+			let logs = this.options.instance ? `${this.options.path}/instances/${this.options.instance}` : this.options.path;
+			if (!fs.existsSync(logs)) fs.mkdirSync(logs, { recursive: true });
+
+			let argumentsLogs: string = gameArguments.join(' ')
+			argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.access_token, '????????')
+			argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.client_token, '????????')
+			argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.uuid, '????????')
+			argumentsLogs = argumentsLogs.replaceAll(this.options.authenticator?.xboxAccount?.xuid, '????????')
+			argumentsLogs = argumentsLogs.replaceAll(`${this.options.path}/`, '')
+			this.emit('data', `Launching with arguments ${argumentsLogs}`);
+
+			// Spawn the game process
+			const minecraftProc = spawn(java, gameArguments, { cwd: logs, detached: this.options.detached }) as ChildProcessWithoutNullStreams;
+
+			// Emit that process is spawned
+			this.emit('spawn', minecraftProc, java, gameArguments, logs);
+
+			minecraftProc.stdout.on('data', (data) => this.emit('data', data.toString('utf-8')))
+			minecraftProc.stderr.on('data', (data) => this.emit('data', data.toString('utf-8')))
+			minecraftProc.on('close', (code) => this.emit('close', 'Minecraft closed'))
+		} catch (err) {
+			this.emit('error', err);
+		} finally {
+			this._abortController = undefined;
+		}
 	}
 
 	async downloadGame() {
