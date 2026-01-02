@@ -7,6 +7,7 @@ import fs from 'fs';
 import os from 'os';
 import semver from 'semver';
 import { getPathLibraries, isold } from '../utils/Index.js';
+import type { LaunchOptions } from '../Launcher.js';
 
 /**
  * Maps the Node.js process.platform values to Mojang's library folders.
@@ -16,29 +17,6 @@ const MOJANG_LIBRARY_MAP: Record<string, string> = {
 	darwin: 'osx',
 	linux: 'linux'
 };
-
-/**
- * Represents options for memory usage, screen size, extra args, etc.
- * Adapt or expand as needed for your use case.
- */
-export interface LaunchOptions {
-	path: string;              // Base path to Minecraft data folder
-	instance?: string;         // Instance name (if using multi-instance approach)
-	authenticator: any;        // Auth object containing tokens, user info, etc.
-	version?: string;         // Minecraft version
-	bypassOffline?: boolean;   // Bypass offline mode for multiplayer
-	memory: {
-		min?: string;             // Minimum memory (e.g. "512M", "1G")
-		max?: string;             // Maximum memory (e.g. "4G", "8G")
-	};
-	screen?: {
-		width?: number;
-		height?: number;
-	};
-	GAME_ARGS: Array<string>;  // Additional arguments passed to the game
-	JVM_ARGS: Array<string>;   // Additional arguments passed to the JVM
-	mcp?: string;              // MCP config path (for modded usage)
-}
 
 /**
  * Represents the data structure of a Minecraft version JSON file (simplified).
@@ -202,7 +180,7 @@ export default class MinecraftArguments {
 		}
 
 		// Add any extra game arguments from user config
-		gameArgs.push(...this.options.GAME_ARGS);
+		gameArgs.push(...(this.options.GAME_ARGS ?? []));
 
 		// Filter out any remaining unexpected objects
 		return gameArgs.filter(item => typeof item === 'string');
@@ -223,8 +201,8 @@ export default class MinecraftArguments {
 
 		// Core JVM arguments
 		const jvmArgs: Array<string> = [
-			`-Xms${this.options.memory.min}`,
-			`-Xmx${this.options.memory.max}`,
+			`-Xms${this.options.memory?.min}`,
+			`-Xmx${this.options.memory?.max}`,
 			'-XX:+UnlockExperimentalVMOptions',
 			'-XX:G1NewSizePercent=20',
 			'-XX:G1ReservePercent=20',
@@ -279,7 +257,7 @@ export default class MinecraftArguments {
 		}
 
 		// Append any user-supplied JVM arguments
-		jvmArgs.push(...this.options.JVM_ARGS);
+		jvmArgs.push(...(this.options.JVM_ARGS ?? []));
 
 		return jvmArgs;
 	}

@@ -143,7 +143,7 @@ export type LaunchOptions = {
 	 * 
 	 * Example: `'PokeMoonX'`
 	 */
-	instance?: string,
+	instance?: string | null,
 	/**
 	 * Should Minecraft process be independent of launcher?
 	 */
@@ -169,23 +169,23 @@ export type LaunchOptions = {
 	 * If `instance` if set, relative to it.
 	 * If `instance` is `undefined`, relative to `path`.
 	 */
-	mcp: any,
+	mcp?: any,
 	/**
 	 * Should game files be verified each launch?
 	 */
-	verify: boolean,
+	verify?: boolean,
 	/**
 	 * Files to ignore from instance. (idk actually luuxis please verify this)
 	 */
-	ignored: string[],
+	ignored?: string[],
 	/**
 	 * Custom JVM arguments. Read more on [wiki.vg](https://wiki.vg/Launching_the_game#JVM_Arguments)
 	 */
-	JVM_ARGS: string[],
+	JVM_ARGS?: string[],
 	/**
 	 * Custom game arguments. Read more on [wiki.vg](https://wiki.vg/Launching_the_game#Game_Arguments)
 	 */
-	GAME_ARGS: string[],
+	GAME_ARGS?: string[],
 	/**
 	 * Java options.
 	 */
@@ -193,18 +193,41 @@ export type LaunchOptions = {
 	/**
 	 * Screen options.
 	 */
-	screen: screenOptions,
+	screen?: screenOptions,
 	/**
 	 * Memory limit options.
 	 */
-	memory: memoryLimits
+	memory?: memoryLimits
 };
 
 export default class Launcher extends EventEmitter {
 	options: LaunchOptions;
 
 	async launch(options: Partial<LaunchOptions>) {
-		const defaultOptions: LaunchOptions = {
+		this.options = this.getLaunchOptions(options);
+		this.options.path = path.resolve(this.options.path).replace(/\\/g, '/');
+
+		if (this.options.mcp) {
+			if (this.options.instance) this.options.mcp = `${this.options.path}/instances/${this.options.instance}/${this.options.mcp}`
+			else this.options.mcp = path.resolve(`${this.options.path}/${this.options.mcp}`).replace(/\\/g, '/')
+		}
+
+		if (this.options.loader.type) {
+			//@ts-ignore
+			this.options.loader.type = this.options.loader.type.toLowerCase()
+			this.options.loader.build = this.options.loader.build.toLowerCase()
+		}
+
+		if (!this.options.authenticator) return this.emit("error", { error: "Authenticator not found" });
+		if (this.options.downloadFileMultiple < 1) this.options.downloadFileMultiple = 1
+		if (this.options.downloadFileMultiple > 30) this.options.downloadFileMultiple = 30
+		if (typeof this.options.loader.path !== 'string') this.options.loader.path = `./loader/${this.options.loader.type}`;
+		if (this.options.java.version && typeof this.options.java.type !== 'string') this.options.java.type = 'jre';
+		this.start();
+	}
+
+	getLaunchOptions(optionsOverride: Partial<LaunchOptions> = {}): LaunchOptions {
+		return {
 			url: null,
 			authenticator: null,
 			timeout: 10000,
@@ -246,34 +269,12 @@ export default class Launcher extends EventEmitter {
 				min: '1G',
 				max: '2G'
 			},
-			...options,
-		};
-
-		this.options = defaultOptions;
-		this.options.path = path.resolve(this.options.path).replace(/\\/g, '/');
-
-		if (this.options.mcp) {
-			if (this.options.instance) this.options.mcp = `${this.options.path}/instances/${this.options.instance}/${this.options.mcp}`
-			else this.options.mcp = path.resolve(`${this.options.path}/${this.options.mcp}`).replace(/\\/g, '/')
+			...optionsOverride,
 		}
-
-		if (this.options.loader.type) {
-			//@ts-ignore
-			this.options.loader.type = this.options.loader.type.toLowerCase()
-			this.options.loader.build = this.options.loader.build.toLowerCase()
-		}
-
-		if (!this.options.authenticator) return this.emit("error", { error: "Authenticator not found" });
-		if (this.options.downloadFileMultiple < 1) this.options.downloadFileMultiple = 1
-		if (this.options.downloadFileMultiple > 30) this.options.downloadFileMultiple = 30
-		if (typeof this.options.loader.path !== 'string') this.options.loader.path = `./loader/${this.options.loader.type}`;
-		if (this.options.java.version && typeof this.options.java.type !== 'string') this.options.java.type = 'jre';
-		this.start();
 	}
 
-
 	async start() {
-		let data: any = await this.DownloadGame();
+		let data: any = await this.downloadGame();
 		if (data.error) return this.emit('error', data);
 		let { minecraftJson, minecraftLoader, minecraftVersion, minecraftJava } = data;
 
@@ -310,7 +311,7 @@ export default class Launcher extends EventEmitter {
 		minecraftDebug.on('close', (code) => this.emit('close', 'Minecraft closed'))
 	}
 
-	async DownloadGame() {
+	async downloadGame() {
 		const InfoVersion = await new jsonMinecraft(this.options).GetInfoVersion();
 		let loaderJson: any = null;
 		if ('error' in InfoVersion) return this.emit('error', InfoVersion);

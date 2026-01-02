@@ -26,7 +26,7 @@ export interface BundleItem {
 export interface MinecraftBundleOptions {
 	path: string;             // The main Minecraft directory or root path
 	instance?: string;        // Instance name, if working with multiple instances
-	ignored: string[];        // Files or directories to ignore when cleaning
+	ignored?: string[];       // Files or directories to ignore when cleaning
 }
 
 /**
@@ -77,7 +77,7 @@ export default class MinecraftBundle {
 
 				// If file is in "ignored" list, skip checks
 				const relativePath = file.path.replace(replaceName, '');
-				if (this.options.ignored.includes(relativePath)) {
+				if ((this.options.ignored ?? []).includes(relativePath)) {
 					continue;
 				}
 
@@ -142,7 +142,7 @@ export default class MinecraftBundle {
 		];
 
 		// Convert custom ignored paths to actual file paths
-		for (let ignoredPath of this.options.ignored) {
+		for (let ignoredPath of (this.options.ignored ?? [])) {
 			ignoredPath = `${this.options.path}${instancePath}/${ignoredPath}`;
 			if (fs.existsSync(ignoredPath)) {
 				if (fs.statSync(ignoredPath).isDirectory()) {
