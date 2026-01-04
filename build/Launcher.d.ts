@@ -6,7 +6,7 @@ import { EventEmitter } from 'events';
 import { ChildProcessWithoutNullStreams } from 'child_process';
 export type LoaderType = 'forge' | 'neoforge' | 'fabric' | 'legacyfabric' | 'quilt';
 export type JavaType = 'jre' | 'jdk' | 'testimage' | 'debugimage' | 'staticlibs' | 'sources' | 'sbom';
-export type loader = {
+export type loaderOptions = {
     /**
      * Path to loader directory. Relative to absolute path to Minecraft's root directory (config option `path`).
      *
@@ -141,7 +141,7 @@ export type LaunchOptions = {
     /**
      * Loader config
      */
-    loader: loader;
+    loader: loaderOptions;
     /**
      * MCPathcer directory. (idk actually luuxis please verify this)
      *

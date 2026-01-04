@@ -4,7 +4,7 @@
  */
 
 import AZauth from './Authenticator/AZauth.js';
-import Launcher from './Launcher.js';
+import Launcher, { JavaType, LaunchOptions, LauncherEvents, LoaderType, javaOptions, loaderOptions, memoryLimits, screenOptions } from './Launcher.js';
 import Microsoft from './Authenticator/Microsoft.js';
 import * as Offline from './Authenticator/Offline.js';
 import * as Mojang from './Authenticator/Mojang.js';
@@ -18,5 +18,13 @@ export {
     Mojang as Mojang,
     Offline as Offline,
     Status as Status,
-    Downloader as Downloader
+    Downloader as Downloader,
+    JavaType,
+    LaunchOptions,
+    LauncherEvents,
+    LoaderType,
+    javaOptions,
+    loaderOptions,
+    memoryLimits,
+    screenOptions
 };
